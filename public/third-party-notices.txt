@@ -1,0 +1,68 @@
+白页 · 第三方许可与数据来源
+
+本项目源码采用 MIT 许可，完整项目许可见 /license.txt。
+Bing 壁纸与 Open-Meteo 免费接口按个人非商用场景使用。软件许可证、在线服务条款和图片版权分别适用；本项目的 MIT 许可不改变第三方权利和条件。
+所有组件与数据来源说明统一展示在“设置 → 关于”。
+
+1. Feather Icons v4.29.2
+https://github.com/feathericons/feather/tree/v4.29.2
+页面行内 SVG 取自上述固定版本，转换为 symbol 并由页面统一设置线宽。
+完整许可如下：
+
+The MIT License (MIT)
+
+Copyright (c) 2013-2023 Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+2. 天气与城市数据
+天气：Open-Meteo https://open-meteo.com/
+城市数据：GeoNames https://www.geonames.org/ （通过 Open-Meteo 城市接口获取）
+Open-Meteo 数据许可：CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+数据经取整、筛选与中文格式化展示，未更改原始预报数值含义。
+免费接口仅供非商用，并有调用配额。
+https://open-meteo.com/en/terms
+https://open-meteo.com/en/licence
+https://www.geonames.org/export/
+
+3. Bing 图片
+图片由 Bing 提供，版权属于对应图片权利人，标题、日期和摄影署名保留在壁纸信息中。
+这不是自由商用图片许可；直连或云端中转也不会转移版权。
+微软条款通常限于个人非商用，另行复制、再分发或作为产品内容可能还需权利人授权。
+https://www.microsoft.com/en-us/servicesagreement#13f_BingandMSN
+
+4. 日照计算
+参考 NOAA Global Monitoring Laboratory 的太阳位置公式，在浏览器本地独立实现。
+https://gml.noaa.gov/grad/solcalc/solareqns.PDF
+https://gml.noaa.gov/about/disclaimer.html
+未使用 NOAA 标识，不表示 NOAA 对本项目背书。
+
+5. 字体、图标与背景
+仅使用访客设备已有的系统字体，不分发字体文件。常用网址使用名称首字。
+默认渐变背景与 favicon 是本项目制作的代码图形；不附带第三方照片。
+搜索引擎名称只用于说明跳转目标，不表示合作或品牌授权。
+
+6. 部署软件
+部署包只包含源码与配置，不包含 Node.js、Nginx 或 Docker 基础镜像二进制。
+Node.js、Nginx 及容器内各系统包适用各自许可证；安装或再分发时保留其原始许可和通知。
+https://github.com/nodejs/node/blob/main/LICENSE
+https://nginx.org/LICENSE
+https://github.com/nginx/docker-nginx/blob/master/LICENSE
+

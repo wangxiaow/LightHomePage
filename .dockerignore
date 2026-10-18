@@ -1,0 +1,12 @@
+# Only send the runtime files to the Docker builder.
+**
+!Dockerfile
+!public/
+!public/**
+!deploy/
+!deploy/nginx.conf
+!deploy/proxy.conf
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
