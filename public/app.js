@@ -1,4 +1,4 @@
-import { SETTINGS_KEY, APP_VERSION, SUPPORTS_LUNAR_CALENDAR, SEARCH_HISTORY_KEY, MAX_CUSTOM_ENGINES, DEFAULTS, SEED_WALLPAPER, readSettings, normalizeSettings, getEngines, validSearchTemplate, readSearchHistory, addSearchHistory, validCity, validWallpaper, safeUrl, searchUrl, localDateKey, formatHomeDate, lunarDateText, greetingText, defaultBackgroundPeriod, normalizeBingImages, weatherCondition } from './core.js';
+import { SETTINGS_KEY, APP_VERSION, SUPPORTS_LUNAR_CALENDAR, SEARCH_HISTORY_KEY, MAX_CUSTOM_ENGINES, DEFAULTS, SEED_WALLPAPER, readSettings, normalizeSettings, normalizeTimeZone, getEngines, validSearchTemplate, readSearchHistory, addSearchHistory, validCity, validWallpaper, safeUrl, searchUrl, localDateKey, formatClockParts, formatHomeDate, lunarDateText, greetingText, defaultBackgroundPeriod, normalizeBingImages, weatherCondition } from './core.js';
 import { wallpaperImageUrl, cloudWallpaperImageUrl, fetchWallpaperBlob } from './images.js';
 import { MAX_JSON_BYTES, mediaType, readResponseBytes } from './network.js';
 
@@ -68,11 +68,41 @@ async function fetchJson(url, signal) {
   return data;
 }
 
+function initializeTimeZones() {
+  const common = [
+    ['Asia/Shanghai', '北京 / 上海'], ['Asia/Hong_Kong', '香港'], ['Asia/Taipei', '台北'],
+    ['Asia/Tokyo', '东京'], ['Asia/Seoul', '首尔'], ['Asia/Singapore', '新加坡'],
+    ['Asia/Bangkok', '曼谷'], ['Asia/Kolkata', '新德里'], ['Asia/Kathmandu', '加德满都'], ['Asia/Dubai', '迪拜'],
+    ['Europe/London', '伦敦'], ['Europe/Paris', '巴黎'], ['Europe/Berlin', '柏林'], ['Europe/Moscow', '莫斯科'],
+    ['America/New_York', '纽约'], ['America/Chicago', '芝加哥'], ['America/Denver', '丹佛'], ['America/Los_Angeles', '洛杉矶'],
+    ['America/Sao_Paulo', '圣保罗'], ['Pacific/Honolulu', '檀香山'], ['Australia/Sydney', '悉尼'], ['Pacific/Auckland', '奥克兰'],
+    ['UTC', '协调世界时'],
+  ];
+  const select = $('#time-zone'), seen = new Set();
+  const group = document.createElement('optgroup'); group.label = '常用时区';
+  for (const [zone, label] of common) {
+    const value = normalizeTimeZone(zone); if (!value || seen.has(value)) continue;
+    group.append(new Option(`${label}（${zone}）`, value)); seen.add(value);
+  }
+  select.append(group);
+  if (typeof Intl.supportedValuesOf === 'function') {
+    const other = document.createElement('optgroup'); other.label = '更多时区';
+    for (const zone of Intl.supportedValuesOf('timeZone')) {
+      const value = normalizeTimeZone(zone); if (!value || seen.has(value)) continue;
+      other.append(new Option(zone, value)); seen.add(value);
+    }
+    select.append(other);
+  }
+}
+function syncTimeZoneSetting() {
+  const select = $('#time-zone');
+  if (settings.timeZone && ![...select.options].some(option => option.value === settings.timeZone)) select.add(new Option(settings.timeZone, settings.timeZone));
+  select.value = settings.timeZone;
+}
 function updateClock() {
   clearTimeout(clockTimer);
   const now = new Date();
-  const parts = [now.getHours(), now.getMinutes()];
-  if (settings.showSeconds) parts.push(now.getSeconds());
+  const parts = formatClockParts(now, settings.timeZone).slice(0, settings.showSeconds ? 3 : 2);
   $('#clock').replaceChildren(...parts.flatMap((part, index) => {
     const number = document.createTextNode(String(part).padStart(2, '0'));
     if (!index) return [number];
@@ -80,8 +110,8 @@ function updateClock() {
     return [colon, number];
   }));
   $('#clock').dateTime = now.toISOString();
-  $('#date').textContent = formatHomeDate(now);
-  const lunar = lunarDateText(now);
+  $('#date').textContent = formatHomeDate(now, settings.timeZone);
+  const lunar = lunarDateText(now, settings.timeZone);
   if (lunar) $('#date').title = lunar; else $('#date').removeAttribute('title');
   $('#greeting').textContent = greetingText(settings, now);
   if (!document.hidden && (settings.showClock || settings.showGreeting || settings.showDate)) {
@@ -119,6 +149,7 @@ function applySettings() {
   $('.site-footer').hidden = !settings.showWallpaperInfo && !settings.showWallpaperMode && !settings.showFullscreen;
   document.querySelectorAll('[data-setting]').forEach(input => { input.checked = settings[input.dataset.setting]; });
   $('[data-setting="showSeconds"]').disabled = !settings.showClock;
+  syncTimeZoneSetting();
   $('[data-setting="useCustomGreeting"]').disabled = !settings.showGreeting;
   $('#custom-greeting-editor').hidden = !settings.useCustomGreeting;
   $('#custom-greeting').value = settings.customGreeting;
@@ -130,9 +161,10 @@ function applySettings() {
   updateEngine(); updateClock(); updateDefaultBackground(); updateWallpaperMetadata(); renderShortcuts();
 }
 function updateEngine() {
-  const engines = getEngines(settings.customEngines), engine = engines[settings.engine];
+  const engines = getEngines(settings.customEngines, settings.engineOrder), engine = engines[settings.engine];
   $('#engine-tabs').replaceChildren(...Object.entries(engines).map(([id, item]) => {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.engine = id; button.textContent = item.name;
+    if (!item.template) { button.draggable = true; button.title = '拖动调整顺序'; }
     button.setAttribute('aria-pressed', String(id === settings.engine)); return button;
   }));
   $('#search-input').name = engine.param || 'q';
@@ -145,6 +177,34 @@ $('#engine-tabs').addEventListener('click', event => {
   const button = event.target.closest('[data-engine]'); if (!button) return;
   settings.engine = button.dataset.engine; saveSettings(); updateEngine(); $('#search-input').focus();
 });
+let engineTabDrag = null;
+function clearEngineTabDrag() {
+  engineTabDrag = null;
+  $('#engine-tabs').querySelectorAll('.is-drop-target').forEach(button => button.classList.remove('is-drop-target'));
+}
+$('#engine-tabs').addEventListener('dragstart', event => {
+  const button = event.target.closest('[data-engine]');
+  if (!button || !settings.engineOrder.includes(button.dataset.engine)) { event.preventDefault(); return; }
+  engineTabDrag = button.dataset.engine;
+  event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', engineTabDrag);
+});
+$('#engine-tabs').addEventListener('dragover', event => {
+  const button = event.target.closest('[data-engine]');
+  $('#engine-tabs').querySelectorAll('.is-drop-target').forEach(target => target.classList.remove('is-drop-target'));
+  if (!engineTabDrag || !button || !settings.engineOrder.includes(button.dataset.engine)) return;
+  event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+  if (button.dataset.engine !== engineTabDrag) button.classList.add('is-drop-target');
+});
+$('#engine-tabs').addEventListener('drop', event => {
+  const button = event.target.closest('[data-engine]');
+  const from = settings.engineOrder.indexOf(engineTabDrag), to = settings.engineOrder.indexOf(button?.dataset.engine);
+  clearEngineTabDrag();
+  if (from < 0 || to < 0) return;
+  event.preventDefault(); if (from === to) return;
+  const [id] = settings.engineOrder.splice(from, 1); settings.engineOrder.splice(to, 0, id);
+  saveSettings(); updateEngine(); announceEngineOrder();
+});
+$('#engine-tabs').addEventListener('dragend', clearEngineTabDrag);
 function submitSearch(value) {
   const query = value.trim();
   $('#search-input').value = query;
@@ -224,11 +284,68 @@ document.addEventListener('pointerdown', event => {
 $('.settings-body').addEventListener('scroll', () => closeEngineDelete(), { passive: true });
 $('#settings-dialog').addEventListener('close', () => closeEngineDelete());
 window.addEventListener('resize', () => closeEngineDelete());
+let engineDrag = null;
+function clearEngineDrag() {
+  const drag = engineDrag; engineDrag = null;
+  if (!drag) return;
+  drag.row.classList.remove('is-dragging');
+  if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
+}
+function announceEngineOrder() {
+  $('#engine-order-status').textContent = `当前顺序：${Object.values(getEngines([], settings.engineOrder)).map(engine => engine.name).join('、')}`;
+}
+function finishEngineDrag(commit) {
+  if (!engineDrag) return;
+  const id = engineDrag.id;
+  const order = [...$('#engine-list').querySelectorAll('[data-sortable-engine]')].map(row => row.dataset.sortableEngine);
+  const changed = order.some((value, index) => value !== settings.engineOrder[index]);
+  clearEngineDrag();
+  if (commit && changed) { settings.engineOrder = order; saveSettings(); }
+  updateEngine();
+  if (commit && changed) announceEngineOrder();
+  $(`[data-sortable-engine="${id}"] .engine-drag-handle`)?.focus({ preventScroll: true });
+}
+$('#engine-list').addEventListener('pointerdown', event => {
+  const handle = event.target.closest('.engine-drag-handle');
+  if (!handle || event.button !== 0 || !event.isPrimary || engineDrag) return;
+  event.preventDefault(); closeEngineDelete();
+  const row = handle.closest('[data-sortable-engine]');
+  engineDrag = { id: row.dataset.sortableEngine, row, handle, pointerId: event.pointerId, startY: event.clientY, moved: false };
+  handle.focus({ preventScroll: true }); handle.setPointerCapture(event.pointerId);
+});
+$('#engine-list').addEventListener('pointermove', event => {
+  if (!engineDrag || engineDrag.pointerId !== event.pointerId || (!engineDrag.moved && Math.abs(event.clientY - engineDrag.startY) < 5)) return;
+  event.preventDefault(); engineDrag.moved = true; engineDrag.row.classList.add('is-dragging');
+  const others = [...$('#engine-list').querySelectorAll('[data-sortable-engine]')].filter(row => row !== engineDrag.row);
+  const target = others.find(row => { const bounds = row.getBoundingClientRect(); return event.clientY < bounds.top + bounds.height / 2; });
+  $('#engine-list').insertBefore(engineDrag.row, target || others.at(-1).nextSibling);
+  engineDrag.handle.setPointerCapture(event.pointerId);
+});
+$('#engine-list').addEventListener('pointerup', event => { if (event.pointerId === engineDrag?.pointerId) finishEngineDrag(true); });
+$('#engine-list').addEventListener('pointercancel', () => finishEngineDrag(false));
+$('#engine-list').addEventListener('lostpointercapture', event => { if (engineDrag && !engineDrag.handle.hasPointerCapture(event.pointerId)) finishEngineDrag(false); });
+$('#engine-list').addEventListener('keydown', event => {
+  const handle = event.target.closest('.engine-drag-handle');
+  if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+  event.preventDefault();
+  const id = handle.closest('[data-sortable-engine]').dataset.sortableEngine;
+  const index = settings.engineOrder.indexOf(id), next = index + (event.key === 'ArrowUp' ? -1 : 1);
+  if (next < 0 || next >= settings.engineOrder.length) return;
+  [settings.engineOrder[index], settings.engineOrder[next]] = [settings.engineOrder[next], settings.engineOrder[index]];
+  saveSettings(); updateEngine(); announceEngineOrder();
+  $(`[data-sortable-engine="${id}"] .engine-drag-handle`).focus({ preventScroll: true });
+});
 function renderEngineList() {
-  closeEngineDelete();
-  const engines = Object.entries(getEngines(settings.customEngines));
+  clearEngineDrag(); closeEngineDelete();
+  const engines = Object.entries(getEngines(settings.customEngines, settings.engineOrder));
   $('#engine-list').replaceChildren(...engines.map(([id, engine], index) => {
     const row = document.createElement('div'); row.className = 'engine-list-row';
+    if (!engine.template) {
+      row.dataset.sortableEngine = id;
+      const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'engine-drag-handle';
+      handle.setAttribute('aria-label', `拖动排序：${engine.name}`); handle.setAttribute('aria-describedby', 'engine-order-note'); handle.title = '拖动排序，或按 ↑ / ↓ 调整'; handle.append(svg('grip'));
+      row.append(handle);
+    }
     const name = document.createElement('span'); name.textContent = engine.name;
     const key = document.createElement('small'); key.textContent = `Alt + ${index + 1}`;
     row.append(name, key);
@@ -256,7 +373,7 @@ document.addEventListener('keydown', event => {
   const editing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
   if (event.key === '/' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); $('#search-input').focus(); }
   if (event.altKey && !event.ctrlKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
-    const engine = Object.keys(getEngines(settings.customEngines))[Number(event.key) - 1];
+    const engine = Object.keys(getEngines(settings.customEngines, settings.engineOrder))[Number(event.key) - 1];
     if (engine) { event.preventDefault(); settings.engine = engine; saveSettings(); updateEngine(); }
   }
   if (event.key === 'Escape' && editing) document.activeElement.blur();
@@ -553,6 +670,7 @@ $('#shortcut-form').addEventListener('submit', event => {
 });
 
 function switchTab(tab) {
+  if (engineDrag) { clearEngineDrag(); renderEngineList(); }
   closeEngineDelete();
   activeTab = tab;
   document.querySelectorAll('[data-tab]').forEach(button => { const selected = button.dataset.tab === tab; button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1; });
@@ -565,6 +683,7 @@ $('#open-settings').addEventListener('click', () => openSettings());
 $('#open-wallpapers').addEventListener('click', () => openSettings('wallpaper'));
 $('#weather').addEventListener('click', () => { openSettings(); $('#city-input').focus(); });
 $('#close-settings').addEventListener('click', () => $('#settings-dialog').close());
+$('#settings-dialog').addEventListener('close', () => { if (engineDrag) { clearEngineDrag(); renderEngineList(); } });
 let settingsIdleTimer;
 function revealSettingsButton() {
   clearTimeout(settingsIdleTimer);
@@ -602,6 +721,9 @@ document.querySelectorAll('[data-setting]').forEach(input => input.addEventListe
 $('#custom-greeting').addEventListener('input', event => {
   settings.customGreeting = event.target.value.slice(0, 80); saveSettings(); updateClock();
 });
+$('#time-zone').addEventListener('change', event => {
+  settings.timeZone = normalizeTimeZone(event.target.value); saveSettings(); updateClock();
+});
 $('#wallpaper-info').addEventListener('click', () => {
   $('#info-title').textContent = currentWallpaper.title; $('#info-description').textContent = currentWallpaper.copyright;
   const date = currentWallpaper.date; $('#info-date').textContent = `${date.slice(0, 4)} 年 ${Number(date.slice(4, 6))} 月 ${Number(date.slice(6, 8))} 日 · Bing 每日壁纸`;
@@ -636,6 +758,7 @@ window.addEventListener('storage', event => {
   if (settings.wallpaperMode === 'fixed') displayWallpaper(settings.pinnedWallpaper, 'pinned'); else loadWallpapers();
 });
 $('#about-version').textContent = APP_VERSION;
+initializeTimeZones();
 applySettings(); renderSearchHistory(); scheduleMidnight(); revealSettingsButton();
 const cachedWallpapers = getCache('wallpapers');
 if (settings.wallpaperMode === 'fixed') displayWallpaper(settings.pinnedWallpaper, 'pinned');

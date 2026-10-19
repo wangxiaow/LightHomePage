@@ -1,6 +1,6 @@
 // Keep the original browser storage namespace so renaming does not reset existing preferences.
 export const SETTINGS_KEY = 'qiye.settings.v1';
-export const APP_VERSION = '0.1.0-Alpha';
+export const APP_VERSION = '0.1.1-Alpha';
 export const SEARCH_HISTORY_KEY = 'qiye.search-history.v1';
 export const MAX_CUSTOM_ENGINES = 6;
 export const MAX_SEARCH_HISTORY = 20;
@@ -16,12 +16,12 @@ export const SEED_WALLPAPER = Object.freeze({
   link: 'https://www.bing.com/search?q=多巴达恩城堡',
 });
 export const DEFAULTS = Object.freeze({
-  version: 2, engine: 'baidu', showGreeting: true, useCustomGreeting: false, customGreeting: '', showClock: true, showSeconds: false, showDate: true,
+  version: 2, engine: 'baidu', showGreeting: true, useCustomGreeting: false, customGreeting: '', showClock: true, timeZone: '', showSeconds: false, showDate: true,
   showWeather: true, showShortcuts: true, showWallpaperButton: false, showWallpaperInfo: true,
   showWallpaperMode: false, showFullscreen: true, cloudImageFallback: false,
   newTab: false, dim: 25, wallpaperMode: 'daily', pinnedWallpaper: null,
   city: { name: '北京', latitude: 39.9042, longitude: 116.4074 },
-  shortcuts: [], customEngines: [],
+  shortcuts: [], customEngines: [], engineOrder: ['baidu', 'google', 'bing'],
 });
 const LEGACY_SHORTCUTS = new Map([
   ['GitHub', { url: 'https://github.com/', icon: 'github' }], ['知乎', { url: 'https://www.zhihu.com/', icon: '知' }],
@@ -49,8 +49,15 @@ export function normalizeCustomEngines(raw) {
   }
   return engines;
 }
-export function getEngines(customEngines = []) {
-  return { ...ENGINES, ...Object.fromEntries(normalizeCustomEngines(customEngines).map(engine => [engine.id, engine])) };
+export function normalizeEngineOrder(raw) {
+  const order = Array.isArray(raw) ? raw.filter(id => typeof id === 'string' && Object.hasOwn(ENGINES, id)) : [];
+  return [...new Set([...order, ...Object.keys(ENGINES)])];
+}
+export function getEngines(customEngines = [], engineOrder) {
+  return Object.fromEntries([
+    ...normalizeEngineOrder(engineOrder).map(id => [id, ENGINES[id]]),
+    ...normalizeCustomEngines(customEngines).map(engine => [engine.id, engine]),
+  ]);
 }
 export function normalizeSearchHistory(raw) {
   if (!Array.isArray(raw)) return [];
@@ -71,15 +78,22 @@ export function validWallpaper(image) {
   return !!image && typeof image.id === 'string' && /^OHR\.[\w-]+_1920x1080\.jpg$/.test(image.id) &&
     typeof image.title === 'string' && typeof image.copyright === 'string' && typeof image.date === 'string' && /^\d{8}$/.test(image.date);
 }
+export function normalizeTimeZone(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 100) return '';
+  try { return new Intl.DateTimeFormat('en', { timeZone: value.trim() }).resolvedOptions().timeZone; }
+  catch { return ''; }
+}
 export function normalizeSettings(raw) {
   const result = structuredClone(DEFAULTS);
   if (!raw || typeof raw !== 'object') return result;
   result.customEngines = normalizeCustomEngines(raw.customEngines);
+  result.engineOrder = normalizeEngineOrder(raw.engineOrder);
   if (Object.hasOwn(getEngines(result.customEngines), raw.engine)) result.engine = raw.engine;
   for (const key of ['showGreeting', 'useCustomGreeting', 'showClock', 'showSeconds', 'showDate', 'showWeather', 'showShortcuts', 'showWallpaperButton', 'showWallpaperInfo', 'showWallpaperMode', 'showFullscreen', 'cloudImageFallback', 'newTab']) {
     if (typeof raw[key] === 'boolean') result[key] = raw[key];
   }
   if (typeof raw.customGreeting === 'string') result.customGreeting = raw.customGreeting.trim().slice(0, 80);
+  result.timeZone = normalizeTimeZone(raw.timeZone);
   if (typeof raw.dim === 'number' && Number.isFinite(raw.dim)) result.dim = Math.round(Math.max(0, Math.min(65, raw.dim)));
   if (validCity(raw.city)) result.city = { name: raw.city.name.trim(), latitude: raw.city.latitude, longitude: raw.city.longitude };
   if (validWallpaper(raw.pinnedWallpaper) && raw.wallpaperMode === 'fixed') {
@@ -107,17 +121,32 @@ export function searchUrl(engine, query, customEngines = []) {
 export function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
-const homeDateFormatter = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
-let lunarFormatter;
+let supportsLunarCalendar = false;
 try {
-  const candidate = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'long', day: 'numeric' });
-  if (candidate.resolvedOptions().calendar === 'chinese') lunarFormatter = candidate;
+  supportsLunarCalendar = new Intl.DateTimeFormat('zh-CN-u-ca-chinese').resolvedOptions().calendar === 'chinese';
 } catch { /* Older browsers may not support the Chinese calendar. */ }
-export const SUPPORTS_LUNAR_CALENDAR = !!lunarFormatter;
-export function formatHomeDate(date = new Date()) {
-  return homeDateFormatter.formatToParts(date).map(part => part.type === 'weekday' ? ` ${part.value}` : part.value).join('');
+export const SUPPORTS_LUNAR_CALENDAR = supportsLunarCalendar;
+let homeFormatters;
+function getHomeFormatters(timeZone = '') {
+  if (homeFormatters?.timeZone === timeZone) return homeFormatters;
+  const options = timeZone ? { timeZone } : {};
+  homeFormatters = {
+    timeZone,
+    clock: new Intl.DateTimeFormat('en-GB', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+    date: new Intl.DateTimeFormat('zh-CN', { ...options, month: 'long', day: 'numeric', weekday: 'long' }),
+    lunar: SUPPORTS_LUNAR_CALENDAR ? new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { ...options, month: 'long', day: 'numeric' }) : null,
+  };
+  return homeFormatters;
 }
-export function lunarDateText(date = new Date()) {
+export function formatClockParts(date = new Date(), timeZone = '') {
+  const parts = getHomeFormatters(timeZone).clock.formatToParts(date);
+  return ['hour', 'minute', 'second'].map(type => parts.find(part => part.type === type).value);
+}
+export function formatHomeDate(date = new Date(), timeZone = '') {
+  return getHomeFormatters(timeZone).date.formatToParts(date).map(part => part.type === 'weekday' ? ` ${part.value}` : part.value).join('');
+}
+export function lunarDateText(date = new Date(), timeZone = '') {
+  const lunarFormatter = getHomeFormatters(timeZone).lunar;
   if (!lunarFormatter) return '';
   const parts = lunarFormatter.formatToParts(date);
   const month = parts.find(part => part.type === 'month')?.value;
@@ -129,7 +158,7 @@ export function lunarDateText(date = new Date()) {
 export function greetingText(settings, date = new Date()) {
   const custom = typeof settings.customGreeting === 'string' ? settings.customGreeting.trim().slice(0, 80) : '';
   if (settings.useCustomGreeting && custom) return custom;
-  const hour = date.getHours();
+  const hour = Number(formatClockParts(date, settings.timeZone)[0]);
   return hour < 6 ? '夜色温柔，记得好好休息。' : hour < 11 ? '晨光正好，开启新的一天。' : hour < 14 ? '日子很慢，今天也很好。' : hour < 18 ? '把午后的时光，留一点给自己。' : '晚风轻轻，愿你此刻自在。';
 }
 // NOAA's solar-position approximation, with the sunrise/sunset horizon at 90.833°.

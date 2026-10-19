@@ -26,20 +26,25 @@ dialog{color:var(--ink);border:1px solid #ffffff8c;box-shadow:0 24px 100px #0a1a
 .custom-greeting-editor>input{width:100%;height:38px;padding:0 12px;border:1px solid #dfe5d7;border-radius:8px;background:#fff;font-size:12px;color:var(--ink)}
 .custom-greeting-editor>input:disabled{opacity:.5}
 .custom-greeting-editor .setting-note{margin:7px 0 0}
+.time-zone-setting{padding:15px 0;border-bottom:1px solid #e9ede4}
+.time-zone-setting>label{display:block;font-size:12px;margin-bottom:10px}
+.time-zone-setting>select{width:100%;min-width:0;height:38px;padding:0 10px;border:1px solid #dfe5d7;border-radius:8px;background:#fff;font:inherit;font-size:12px;color:var(--ink)}
+.time-zone-setting>select:focus-visible{outline:2px solid #98b4a0;outline-offset:3px}
+.time-zone-setting .setting-note{margin:7px 0 0}
 .greeting{max-width:min(670px,calc(100vw - 48px));line-height:1.8;overflow-wrap:anywhere}
 .header-settings{transition:opacity .25s,background .15s}
 .header-settings.is-idle{opacity:0;pointer-events:none}
 .header-settings:focus-visible{opacity:1;pointer-events:auto}
 .about-identity{display:flex;align-items:center;gap:12px;margin:2px 0 22px}
 .about-identity>img{flex-shrink:0;border-radius:12px}
-.about-identity h2{font-size:23px;line-height:1.2;font-weight:500;margin:0 0 7px}
-.about-identity p{font-size:10px;color:#8b9588;margin:0}
+.about-identity h2{font-size:23px;line-height:1.2;font-weight:500;margin:0}
 .version-badge{margin-left:auto;padding:5px 8px;border:1px solid #dfe6d9;border-radius:6px;white-space:nowrap;font-size:10px;color:var(--accent);background:#eef3eb}
 .about-repository{display:flex;align-items:center;gap:12px;padding:15px;border:1px solid #e1e7dc;border-radius:10px;background:#fff;font-size:12px;color:var(--accent)}
 .about-repository>span{flex:1;min-width:0}
 .about-repository small{display:block;margin-top:6px;color:#939b8c;font-size:10px;overflow-wrap:anywhere}
 .about-repository>svg{width:17px;height:17px}
 .about-repository:hover{border-color:#afc1ac}
+.about-repository+.about-repository{margin-top:10px}
 .about-license{padding:17px 0;border-bottom:1px solid #e4eadd}
 .about-license h3{font-size:12px;font-weight:600;margin:0 0 9px}
 .about-license p{font-size:11px;color:#8b9588;line-height:1.9;margin:0 0 8px;overflow-wrap:anywhere}
@@ -57,6 +62,8 @@ body { background:var(--default-color); }
 .search-submit { flex-shrink:0; }
 .engine-tabs { flex-wrap:wrap; column-gap:27px; row-gap:4px; }
 .engine-tabs button { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.engine-tabs button[draggable="true"] { cursor:grab; }
+.engine-tabs button.is-drop-target { outline:1px dashed currentColor; outline-offset:5px; border-radius:2px; }
 .search-history { display:flex; align-items:center; gap:8px; margin:8px 4px 0; }
 .history-label { flex-shrink:0; font-size:10px; opacity:.65; }
 .history-clear { flex-shrink:0; background:transparent; color:inherit; font-size:10px; padding:6px 2px; opacity:.75; }
@@ -77,6 +84,10 @@ body { background:var(--default-color); }
 .engine-list-row button { display:grid; place-items:center; width:29px; height:29px; padding:6px; color:#939b8c; background:transparent; border-radius:5px; }
 .engine-list-row button svg { width:15px; height:15px; }
 .engine-list-row button:hover { color:#a55f46; background:#f4ebe6; }
+.engine-list-row .engine-drag-handle { flex-shrink:0; cursor:grab; touch-action:none; user-select:none; color:#8b9d8a; }
+.engine-list-row .engine-drag-handle:hover { color:var(--accent); background:var(--accent-light); }
+.engine-list-row.is-dragging { background:var(--accent-light); border-radius:6px; outline:1px solid #afc1ac; }
+.engine-list-row.is-dragging .engine-drag-handle { cursor:grabbing; }
 .engine-delete-popover { position:fixed; inset:auto; margin:0; width:min(276px,calc(100vw - 48px)); padding:17px; border:1px solid #dce4d7; border-radius:12px; background:#fafbf8; color:var(--ink); box-shadow:0 10px 36px #14221935; z-index:30; }
 .engine-delete-popover h2 { margin:0; font-size:13px; font-weight:600; }
 .engine-delete-popover p { margin:9px 0 16px; font-size:11px; line-height:1.8; color:#8b9588; overflow-wrap:anywhere; }
