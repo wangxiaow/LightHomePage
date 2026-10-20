@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { APP_VERSION, SEED_WALLPAPER } from './public/core.js';
 import { wallpaperImageUrl } from './public/images.js';
 import { MAX_IMAGE_BYTES, MAX_JSON_BYTES, mediaType, isRasterImage, readResponseBytes } from './public/network.js';
+import { createClientAddressResolver } from './client-address.mjs';
 
 const publicDirectory = fileURLToPath(new URL('./public/', import.meta.url));
 const files = new Map([
@@ -70,7 +71,8 @@ export function apiTarget(url) {
   return null;
 }
 
-export function createApp({ upstreamFetch = fetch } = {}) {
+export function createApp({ upstreamFetch = fetch, trustedProxies = '', upstreamTimeoutMs = 10000 } = {}) {
+  const clientAddress = createClientAddressResolver(trustedProxies);
   const cache = new Map(), pending = new Map(), limiter = createRateLimiter();
   let cacheBytes = 0, pendingImages = 0;
   function cachePut(key, value) {
@@ -90,12 +92,13 @@ export function createApp({ upstreamFetch = fetch } = {}) {
     if (target.type === 'image') pendingImages++;
     const task = (async () => {
       try {
-        const response = await upstreamFetch(target.url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': `BaiyeStartpage/${APP_VERSION}`, Accept: target.type === 'image' ? 'image/jpeg' : 'application/json' }, redirect: 'error' });
+        const response = await upstreamFetch(target.url, { signal: AbortSignal.timeout(upstreamTimeoutMs), headers: { 'User-Agent': `BaiyeStartpage/${APP_VERSION}`, Accept: target.type === 'image' ? 'image/jpeg' : 'application/json', 'Accept-Encoding': 'identity' }, redirect: 'error' });
         const contentType = mediaType(response.headers.get('content-type'));
         if (!response.ok || (target.type === 'image' ? !isRasterImage(contentType) : contentType !== 'application/json')) {
           await response.body?.cancel().catch(() => {}); throw new Error('Unexpected upstream status or type');
         }
-        const body = Buffer.from(await readResponseBytes(response, target.type === 'image' ? MAX_IMAGE_BYTES : MAX_JSON_BYTES));
+        const bytes = await readResponseBytes(response, target.type === 'image' ? MAX_IMAGE_BYTES : MAX_JSON_BYTES);
+        const body = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         if (!body.length) throw new Error('Empty upstream response');
         if (target.type === 'json') JSON.parse(body.toString('utf8'));
         const value = { body, contentType, expires: Date.now() + target.ttl };
@@ -125,7 +128,8 @@ export function createApp({ upstreamFetch = fetch } = {}) {
       if (url.pathname.startsWith('/api/')) {
         const target = apiTarget(url);
         if (!target) { send(response, 400, '{"error":"Invalid API request"}', apiSecurityHeaders, head); return; }
-        const address = request.socket.remoteAddress || 'local';
+        const address = clientAddress(request);
+        if (!address) { send(response, 400, '{"error":"Trusted proxy must supply one valid client IP"}', apiSecurityHeaders, head); return; }
         if (!limiter.allow(address)) { send(response, 429, '{"error":"Too many requests"}', { ...apiSecurityHeaders, 'Retry-After': '60' }, head); return; }
         if (target.type === 'redirect') {
           send(response, 302, '', { Location: target.url, 'Cache-Control': 'public, max-age=86400' }, head); return;
@@ -150,5 +154,5 @@ export function createApp({ upstreamFetch = fetch } = {}) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 5173), host = process.env.HOST || '127.0.0.1';
-  createApp().listen(port, host, () => console.log(`白页已启动 · http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`));
+  createApp({ trustedProxies: process.env.TRUSTED_PROXIES || '' }).listen(port, host, () => console.log(`白页已启动 · http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`));
 }

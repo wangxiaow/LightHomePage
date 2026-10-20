@@ -23,7 +23,7 @@
 
 白页是一个轻量、简洁、可自行部署的浏览器主页。它将搜索、每日壁纸、时间天气与常用网站放在一页中，让每次打开浏览器都更顺手。
 
-项目使用原生 HTML、CSS 和 JavaScript，无前端框架、无 npm 依赖，无需打包构建。个人设置保存在浏览器本地，无需注册账号或配置数据库。生产环境由 Nginx 提供静态页面、接口代理与缓存。
+项目使用原生 HTML、CSS 和 JavaScript，无前端框架、无 npm 依赖，无需打包构建。个人设置保存在浏览器本地，无需注册账号或配置数据库。开发与生产统一由 Node.js 提供静态页面、接口代理与有容量上限的内存缓存，可在前面配置 Nginx 提供 HTTPS。
 
 ## 功能
 
@@ -67,6 +67,7 @@ npm run dev
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | 服务监听地址。 |
 | `PORT` | `5173` | 服务监听端口。 |
+| `TRUSTED_PROXIES` | 空 | 逗号分隔的可信反向代理 IP，仅接受准确的 IPv4/IPv6 地址。默认不信任转发头；启用后，该代理的 API 请求必须提供单个有效的 `X-Forwarded-For`。 |
 
 ## 部署
 
@@ -78,13 +79,17 @@ npm run dev
 docker compose up -d --build
 ```
 
-服务默认监听宿主机的 [http://127.0.0.1:8080](http://127.0.0.1:8080)，可通过宿主机的反向代理配置域名和 HTTPS。生产容器使用 Nginx，无需运行 Node.js。
+服务默认监听宿主机的 [http://127.0.0.1:8080](http://127.0.0.1:8080)。容器内运行 Node.js，宿主机无需安装 Node.js。通过反向代理公开站点时，必须按下文配置可信代理和 HTTPS。
+
+容器以非 root 用户、只读文件系统运行，内存上限为 256 MiB。缓存总量最多 24 MiB、150 项，不写磁盘；重启后会重新获取缓存。图片响应最大 12 MiB，JSON 最大 512 KiB，上游请求包含正文读取在内最多 10 秒，超限取消且不缓存。用户保存在浏览器的设置与壁纸副本不受影响。
 
 在项目根目录创建 `.env` 文件，可调整监听地址与端口：
 
 ```dotenv
 BAIYE_BIND_IP=127.0.0.1
 BAIYE_PORT=8080
+# 直接访问时留空；反向代理部署时填写容器实际看到的代理 IP。
+BAIYE_TRUSTED_PROXIES=
 ```
 
 若需对外直接监听，将 `BAIYE_BIND_IP` 改为 `0.0.0.0`，并按部署环境配置网络访问规则与 HTTPS。
@@ -92,8 +97,9 @@ BAIYE_PORT=8080
 常用命令：
 
 ```bash
-# 更新源码后重新部署
-docker compose up -d --build
+# 更新源码后获取基础镜像更新并重新部署
+docker compose build --pull
+docker compose up -d
 
 # 查看服务状态
 docker compose ps
@@ -105,17 +111,21 @@ docker compose logs --tail=50
 docker compose down
 ```
 
-### 原生 Nginx
+### Nginx / HTTPS 入口
 
-项目也支持直接部署到已有 Nginx 的主机：
+Nginx 只转发到本项目的 Node 服务，外部 Bing/Open-Meteo 请求必须经过 Node 的大小、类型、超时与缓存检查。不要继续使用旧版直接代理外部 API 的 Nginx 配置。
 
-1. 将 `public/` 目录中的文件复制到站点根目录。
-2. 参考 [deploy/nginx.conf](deploy/nginx.conf)，将 `server` 配置合入现有配置，调整站点根目录、监听端口和域名，并配置 HTTPS。
-3. 将其中的 `proxy_cache_path`、`limit_req_zone`、`limit_conn_zone`、`map` 和 `resolver` 指令合入 Nginx 的 `http` 配置块。
-4. 将 [deploy/proxy.conf](deploy/proxy.conf) 放到 `/etc/nginx/baiye-proxy.conf`，按系统环境调整受信任 CA 文件路径。
-5. 确保 Nginx 工作进程可写入 `/var/cache/nginx/baiye`，执行 `nginx -t`，通过后重新加载配置。
+1. 用 Compose 启动服务；或者在宿主机使用进程管理器运行 `HOST=127.0.0.1 PORT=8080 TRUSTED_PROXIES=127.0.0.1,::1 node server.mjs`。
+2. 参考 [deploy/nginx.conf](deploy/nginx.conf)，将 `server` 配置合入现有配置，调整域名与 HTTPS 证书。示例后端为 `127.0.0.1:8080`。
+3. 将 [deploy/proxy.conf](deploy/proxy.conf) 放到 `/etc/nginx/baiye-proxy.conf`。它使用 `X-Forwarded-For $remote_addr` **覆盖**访客传来的 IP，不要改成 `$proxy_add_x_forwarded_for`。
+4. 为 Node 配置可信代理：原生本机部署使用 `127.0.0.1,::1`；Docker 桥接部署填写 Node 实际看到的宿主机代理地址，通常是所属网络的网关。可通过 `docker inspect "$(docker compose ps -q homepage)" --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'` 查看网关，并核对实际网络路径。将确认后的准确地址写入 `.env` 的 `BAIYE_TRUSTED_PROXIES`，执行 `docker compose up -d` 应用环境变量。
+5. 后端继续绑定回环地址或限制为仅允许可信入口连接。执行 `nginx -t` 后重新加载配置；通过入口访问 `/api/bing` 应返回 200，缺少有效访客 IP 的已配置可信代理请求将返回 400。
 
-仓库中的完整 Nginx 配置用于独立容器；已有站点请按上述方式合并配置。部署时需同时保留页面资源与 `/api/*` 同源接口。主机需能够访问 Bing、Open-Meteo 天气接口及其城市搜索接口。
+应用按访客 IP 限制 API 请求，每分钟最多 100 次；单个访客用完配额不会占用其他访客的额度。默认忽略非可信来源的转发头，地址错误时不会自动扩大信任范围。不要填写所有网段或根据访客提供的请求头自动识别代理。
+
+若入口前还有 CDN/负载均衡器，先在入口 Nginx 使用 `set_real_ip_from` 精确列出可信来源，再配置对应的 `real_ip_header`，使 `$remote_addr` 表示实际访客；相关来源必须由网络访问规则保证。不要将整段公网或不受控的容器网络列为可信来源。
+
+从旧版迁移时，替换旧 Nginx 外部 API 代理配置及 `baiye-proxy.conf`，移除旧的 `proxy_cache_path` 和按后端代理地址设置的限流规则，再重建容器。新的 Compose 不再使用 `wallpaper-cache` 卷，旧缓存卷不会被自动删除。主机仍需能够访问 Bing、Open-Meteo 及城市搜索接口。
 
 ## 使用说明
 
@@ -168,9 +178,11 @@ LightHomePage/
 ├── public/            页面、样式、前端逻辑与公开许可声明
 ├── deploy/            Nginx 站点与代理配置
 ├── licenses/          第三方组件许可
-├── server.mjs         本地服务与缓存代理
+├── server.mjs         开发与生产服务、有容量上限的缓存代理
+├── client-address.mjs 可信代理与客户端 IP 校验
+├── test/              自动化与安全回归测试
 ├── package.json       项目信息与运行命令
-├── Dockerfile         Nginx 容器镜像配置
+├── Dockerfile         Node.js 生产容器镜像配置
 ├── compose.yaml       Docker Compose 部署配置
 ├── LICENSE            项目 MIT 许可
 └── README.md          项目说明
@@ -181,7 +193,13 @@ LightHomePage/
 ```bash
 # JavaScript 语法检查
 npm run check
+# 功能与安全回归测试（无需安装 npm 依赖）
+npm test
 ```
+
+Nginx 集成测试在未配置可执行文件时跳过。Linux 可设置 `BAIYE_NGINX_EXE=/usr/sbin/nginx BAIYE_NGINX_MIME=/etc/nginx/mime.types npm test`；Windows 设置 `BAIYE_NGINX_EXE` 为 nginx.exe 的绝对路径。测试只连接本机模拟上游，覆盖缓存变体、伪造转发头、访客额度隔离以及超大响应拒绝。安全边界见 [SECURITY.md](SECURITY.md)。
+
+GitHub Actions 会在推送和拉取请求中运行语法检查、全部测试及生产容器启动检查。
 
 ## 参与贡献
 

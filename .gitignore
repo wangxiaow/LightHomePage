@@ -6,6 +6,8 @@
 !/LICENSE
 !/package.json
 !/server.mjs
+!/client-address.mjs
+!/SECURITY.md
 !/Dockerfile
 !/compose.yaml
 
@@ -25,6 +27,16 @@
 /deploy/*
 !/deploy/nginx.conf
 !/deploy/proxy.conf
+
+!/test/
+/test/*
+!/test/*.test.mjs
+
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/security.yml
 
 !/licenses/
 /licenses/*

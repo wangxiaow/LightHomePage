@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node server.mjs",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check public/app.js && node --check public/core.js && node --check public/images.js && node --check public/network.js"
+    "check": "node --check server.mjs && node --check client-address.mjs && node --check public/app.js && node --check public/core.js && node --check public/images.js && node --check public/network.js",
+    "test": "node --test test/*.test.mjs"
   }
 }
