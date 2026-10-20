@@ -1,6 +1,6 @@
 {
   "name": "baiye-startpage",
-  "version": "0.1.1-Alpha",
+  "version": "0.1.2-Alpha",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/wangxiaow/LightHomePage.git" },
   "private": true,
