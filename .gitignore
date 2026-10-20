@@ -28,15 +28,9 @@
 !/deploy/nginx.conf
 !/deploy/proxy.conf
 
-!/test/
-/test/*
-!/test/*.test.mjs
-
-!/.github/
-/.github/*
-!/.github/workflows/
-/.github/workflows/*
-!/.github/workflows/security.yml
+# Local verification files are not published to either remote.
+/test/
+/.github/
 
 !/licenses/
 /licenses/*

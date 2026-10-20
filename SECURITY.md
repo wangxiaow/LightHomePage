@@ -9,7 +9,6 @@
 | 上游 Vary 允许客户端制造缓存变体 | 开发与生产统一由 Node 处理外部请求，缓存只按校验、规范化后的上游 URL 建立；客户端请求头不参与缓存，外部 Vary 不透传。Nginx 只代理 Node，关闭自身代理缓存 | 变化 Accept-Encoding 和无关查询参数仍命中同一缓存，外部请求仅一次 |
 | 反向代理后所有访客共享限流配额 | 增加 TRUSTED_PROXIES 准确 IP 白名单；仅从可信连接读取单个有效 X-Forwarded-For；Nginx 覆盖传入身份头。IP 文本规范化后再限流 | 一个访客收到 429 后另一访客仍为 200；伪造头不能越过入口；非法代理配置拒绝启动 |
 | 生产 Nginx 缺少响应总大小限制 | Docker 运行 Node 的流式读取检查：图片 12 MiB、JSON 512 KiB、总耗时 10 秒；完成校验前不向客户端返回内容。缓存总计 24 MiB/150 项；不写磁盘。Nginx 关闭响应落盘和代理缓存 | 无长度头、伪造长度、13 MiB 图片和持续小块响应均受限制；异常内容不缓存，后续请求可恢复 |
-| 安全测试未随仓库发布 | 调整 .gitignore 允许提交 test/*.test.mjs、本文档及 CI；增加 npm test | GitHub Actions 配置包含语法检查、Nginx 集成测试、Docker 启动与只读/非 root 检查 |
 
 生产镜像已由 Nginx 改为 Node.js 22 Alpine，不新增 npm 依赖。Compose 内存额度从 64 MiB 调整为 256 MiB，以容纳运行时、缓存和受限的并发下载；V8 堆上限为 96 MiB。容器以非 root 用户、只读根文件系统运行，删除所有 Linux capabilities，保留进程/CPU/日志大小限制，不再挂载磁盘缓存卷。
 
@@ -33,17 +32,17 @@
 
 ## 验证与实际限制
 
-本机使用 Node.js 26.7.0 和已有的 Nginx 1.30.6 便携版，语法检查及全部 51 项测试通过（无跳过）。测试只连接回环地址及受控模拟上游，不对线上站点压测。运行方式：
+本机使用 Node.js 26.7.0 和已有的 Nginx 1.30.6 便携版，语法检查及全部 51 项测试通过（无跳过）。测试只连接回环地址及受控模拟上游，不对线上站点压测。`test/` 与 `.github/` 仅在本地保留，不随 GitHub 或 GitCode 仓库发布。
+
+仓库源码支持以下语法检查：
 
 ```powershell
-$env:BAIYE_NGINX_EXE = 'G:\codex\homepage\test-artifacts\nginx-security\nginx-1.30.6\nginx.exe'
 npm run check
-npm test
 ```
 
-Linux 可设置 BAIYE_NGINX_EXE=/usr/sbin/nginx、BAIYE_NGINX_MIME=/etc/nginx/mime.types。未提供 Nginx 时集成测试跳过；CI 配置会提供它。
+保留本地测试文件的开发环境可运行 `node --test test/*.test.mjs`，并通过 BAIYE_NGINX_EXE 指定本机 Nginx 路径。未提供 Nginx 时集成测试跳过。
 
-- 本机未安装 Docker，不能在此验证 Linux 镜像构建、Compose 网络或内核资源限制。已加入 CI 容器启动检查，但本次未推送或运行远程工作流。
+- 本机未安装 Docker，不能在此验证 Linux 镜像构建、Compose 网络或内核资源限制；这些检查需在目标部署环境执行。
 - 线上 HTTPS、证书续期、防火墙、真实代理来源、镜像与操作系统补丁状态仍需由部署环境确认。更新时执行 docker compose build --pull，再 docker compose up -d。
 - 内存上限与请求配额可限制资源使用，但不保证在分布式攻击或共享上游故障下持续可用。
 - 搜索历史保存在当前浏览器；同一浏览器配置文件的使用者可见。用户主动添加的 HTTP 搜索引擎仍使用明文请求。

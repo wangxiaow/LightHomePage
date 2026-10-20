@@ -180,7 +180,6 @@ LightHomePage/
 ├── licenses/          第三方组件许可
 ├── server.mjs         开发与生产服务、有容量上限的缓存代理
 ├── client-address.mjs 可信代理与客户端 IP 校验
-├── test/              自动化与安全回归测试
 ├── package.json       项目信息与运行命令
 ├── Dockerfile         Node.js 生产容器镜像配置
 ├── compose.yaml       Docker Compose 部署配置
@@ -193,13 +192,9 @@ LightHomePage/
 ```bash
 # JavaScript 语法检查
 npm run check
-# 功能与安全回归测试（无需安装 npm 依赖）
-npm test
 ```
 
-Nginx 集成测试在未配置可执行文件时跳过。Linux 可设置 `BAIYE_NGINX_EXE=/usr/sbin/nginx BAIYE_NGINX_MIME=/etc/nginx/mime.types npm test`；Windows 设置 `BAIYE_NGINX_EXE` 为 nginx.exe 的绝对路径。测试只连接本机模拟上游，覆盖缓存变体、伪造转发头、访客额度隔离以及超大响应拒绝。安全边界见 [SECURITY.md](SECURITY.md)。
-
-GitHub Actions 会在推送和拉取请求中运行语法检查、全部测试及生产容器启动检查。
+安全边界与本次修复的本地验证记录见 [SECURITY.md](SECURITY.md)。
 
 ## 参与贡献
 
