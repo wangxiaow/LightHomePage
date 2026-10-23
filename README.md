@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-55745e.svg" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/Version-0.1.2--Alpha-55745e.svg" alt="Version: 0.1.2-Alpha">
+  <img src="https://img.shields.io/badge/Version-0.1.5--Beta-55745e.svg" alt="Version: 0.1.5-Beta">
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22-55745e.svg" alt="Node.js: >=22">
 </p>
 
