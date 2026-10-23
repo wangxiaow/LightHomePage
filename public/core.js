@@ -21,7 +21,7 @@ export const DEFAULTS = Object.freeze({
   showWallpaperMode: false, showFullscreen: true, cloudImageFallback: false,
   newTab: false, dim: 25, wallpaperMode: 'daily', pinnedWallpaper: null,
   city: { name: '北京', latitude: 39.9042, longitude: 116.4074 },
-  shortcuts: [], customEngines: [], engineOrder: ['baidu', 'google', 'bing'],
+  shortcuts: [], customEngines: [], engineOrder: ['baidu', 'google', 'bing'], hiddenEngines: [], googleNoticeDismissed: false,
 });
 const LEGACY_SHORTCUTS = new Map([
   ['GitHub', { url: 'https://github.com/', icon: 'github' }], ['知乎', { url: 'https://www.zhihu.com/', icon: '知' }],
@@ -53,9 +53,15 @@ export function normalizeEngineOrder(raw) {
   const order = Array.isArray(raw) ? raw.filter(id => typeof id === 'string' && Object.hasOwn(ENGINES, id)) : [];
   return [...new Set([...order, ...Object.keys(ENGINES)])];
 }
-export function getEngines(customEngines = [], engineOrder) {
+function normalizeHiddenEngines(raw, engineOrder) {
+  const hidden = Array.isArray(raw) ? normalizeEngineOrder(engineOrder).filter(id => raw.includes(id)) : [];
+  // Always keep at least one built-in engine available, even after custom engines are removed.
+  return hidden.length === Object.keys(ENGINES).length ? hidden.slice(1) : hidden;
+}
+export function getEngines(customEngines = [], engineOrder, hiddenEngines = []) {
+  const hidden = normalizeHiddenEngines(hiddenEngines, engineOrder);
   return Object.fromEntries([
-    ...normalizeEngineOrder(engineOrder).map(id => [id, ENGINES[id]]),
+    ...normalizeEngineOrder(engineOrder).filter(id => !hidden.includes(id)).map(id => [id, ENGINES[id]]),
     ...normalizeCustomEngines(customEngines).map(engine => [engine.id, engine]),
   ]);
 }
@@ -88,8 +94,10 @@ export function normalizeSettings(raw) {
   if (!raw || typeof raw !== 'object') return result;
   result.customEngines = normalizeCustomEngines(raw.customEngines);
   result.engineOrder = normalizeEngineOrder(raw.engineOrder);
-  if (Object.hasOwn(getEngines(result.customEngines), raw.engine)) result.engine = raw.engine;
-  for (const key of ['showGreeting', 'useCustomGreeting', 'showClock', 'showSeconds', 'showDate', 'showWeather', 'showShortcuts', 'showWallpaperButton', 'showWallpaperInfo', 'showWallpaperMode', 'showFullscreen', 'cloudImageFallback', 'newTab']) {
+  result.hiddenEngines = normalizeHiddenEngines(raw.hiddenEngines, result.engineOrder);
+  const engines = getEngines(result.customEngines, result.engineOrder, result.hiddenEngines);
+  result.engine = Object.hasOwn(engines, raw.engine) ? raw.engine : Object.keys(engines)[0];
+  for (const key of ['showGreeting', 'useCustomGreeting', 'showClock', 'showSeconds', 'showDate', 'showWeather', 'showShortcuts', 'showWallpaperButton', 'showWallpaperInfo', 'showWallpaperMode', 'showFullscreen', 'cloudImageFallback', 'newTab', 'googleNoticeDismissed']) {
     if (typeof raw[key] === 'boolean') result[key] = raw[key];
   }
   if (typeof raw.customGreeting === 'string') result.customGreeting = raw.customGreeting.trim().slice(0, 80);

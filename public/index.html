@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#536451">
   <meta name="description" content="让白页，更顺手。轻量、安静、属于你的浏览器主页。">
-  <title>白页</title>
+  <title>我好酷</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://www.bing.com" crossorigin>
   <link rel="stylesheet" href="/styles.css">
@@ -67,6 +67,10 @@
         <input id="search-input" name="wd" type="search" placeholder="搜点什么，发现更多。" autocomplete="off" spellcheck="false" maxlength="2000">
         <button class="search-submit" type="submit" aria-label="搜索"><svg><use href="#i-arrow"/></svg></button>
       </form>
+      <div class="google-notice" id="google-notice" hidden>
+        <p role="status">Google搜索在中国大陆地区可能无法正常工作，请您注意</p>
+        <button type="button" id="dismiss-google-notice">不再提示</button>
+      </div>
       <section class="search-history" id="search-history" aria-labelledby="search-history-title" hidden>
         <span class="history-label" id="search-history-title">历史搜索</span>
         <ul class="history-list" id="search-history-list"></ul>
@@ -77,6 +81,7 @@
   </main>
 
   <footer class="site-footer">
+    <!-- ICP_REGISTRATION -->
     <div class="wallpaper-credit" id="wallpaper-credit">
       <svg class="credit-icon"><use href="#i-location"/></svg>
       <div><button type="button" id="wallpaper-info" title="查看壁纸信息">风景正在路上<svg><use href="#i-info"/></svg></button><div class="wallpaper-source" id="wallpaper-source">Bing 每日壁纸</div></div>
@@ -126,7 +131,7 @@
         <h2>搜索偏好</h2>
         <label class="setting-row"><span>在新标签页搜索</span><input type="checkbox" data-setting="newTab" class="switch"></label>
         <h2 class="section-gap">搜索引擎</h2>
-        <p class="panel-description">默认提供百度、Google、Bing，可再添加 6 个搜索引擎。</p>
+        <p class="panel-description">默认提供百度、Google、Bing，可隐藏或重新显示，不能删除，至少保留一个默认引擎。可再添加 6 个自定义搜索引擎。</p>
         <p class="setting-note" id="engine-order-note">拖动默认引擎左侧的手柄调整顺序，也可聚焦手柄后按 ↑ / ↓。首页与快捷键同步更新。</p>
         <div id="engine-list" class="engine-list"></div>
         <p class="sr-only" id="engine-order-status" role="status" aria-live="polite"></p>

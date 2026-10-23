@@ -161,7 +161,7 @@ function applySettings() {
   updateEngine(); updateClock(); updateDefaultBackground(); updateWallpaperMetadata(); renderShortcuts();
 }
 function updateEngine() {
-  const engines = getEngines(settings.customEngines, settings.engineOrder), engine = engines[settings.engine];
+  const engines = getEngines(settings.customEngines, settings.engineOrder, settings.hiddenEngines), engine = engines[settings.engine];
   $('#engine-tabs').replaceChildren(...Object.entries(engines).map(([id, item]) => {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.engine = id; button.textContent = item.name;
     if (!item.template) { button.draggable = true; button.title = '拖动调整顺序'; }
@@ -171,8 +171,18 @@ function updateEngine() {
   $('#search-form').action = engine.action || searchUrl(settings.engine, '', settings.customEngines);
   $('#search-form').target = settings.newTab ? '_blank' : '_self';
   $('#search-form').rel = 'noopener noreferrer';
+  updateGoogleNotice();
   renderEngineList();
 }
+function updateGoogleNotice() {
+  const visible = settings.engine === 'google' && !settings.googleNoticeDismissed;
+  $('#google-notice').hidden = !visible;
+  if (visible) $('#search-input').setAttribute('aria-describedby', 'google-notice');
+  else $('#search-input').removeAttribute('aria-describedby');
+}
+$('#dismiss-google-notice').addEventListener('click', () => {
+  settings.googleNoticeDismissed = true; saveSettings(); updateGoogleNotice(); $('#search-input').focus();
+});
 $('#engine-tabs').addEventListener('click', event => {
   const button = event.target.closest('[data-engine]'); if (!button) return;
   settings.engine = button.dataset.engine; saveSettings(); updateEngine(); $('#search-input').focus();
@@ -269,7 +279,7 @@ $('#confirm-engine-delete').addEventListener('click', () => {
   if (!id) return;
   closeEngineDelete();
   settings.customEngines = settings.customEngines.filter(engine => engine.id !== id);
-  if (settings.engine === id) settings.engine = 'baidu';
+  settings = normalizeSettings(settings);
   saveSettings(); updateEngine(); $('#engine-name').focus();
 });
 engineDeletePopover.addEventListener('toggle', event => {
@@ -338,7 +348,8 @@ $('#engine-list').addEventListener('keydown', event => {
 function renderEngineList() {
   clearEngineDrag(); closeEngineDelete();
   const engines = Object.entries(getEngines(settings.customEngines, settings.engineOrder));
-  $('#engine-list').replaceChildren(...engines.map(([id, engine], index) => {
+  const visibleIds = Object.keys(getEngines(settings.customEngines, settings.engineOrder, settings.hiddenEngines));
+  $('#engine-list').replaceChildren(...engines.map(([id, engine]) => {
     const row = document.createElement('div'); row.className = 'engine-list-row';
     if (!engine.template) {
       row.dataset.sortableEngine = id;
@@ -347,17 +358,28 @@ function renderEngineList() {
       row.append(handle);
     }
     const name = document.createElement('span'); name.textContent = engine.name;
-    const key = document.createElement('small'); key.textContent = `Alt + ${index + 1}`;
+    const index = visibleIds.indexOf(id);
+    const key = document.createElement('small'); key.textContent = index < 0 ? '已隐藏' : `Alt + ${index + 1}`;
     row.append(name, key);
     if (engine.template) {
       const remove = document.createElement('button'); remove.type = 'button'; remove.setAttribute('aria-label', `删除搜索引擎：${engine.name}`); remove.setAttribute('aria-haspopup', 'dialog'); remove.setAttribute('aria-controls', 'engine-delete-popover'); remove.setAttribute('aria-expanded', 'false'); remove.append(svg('trash'));
       remove.addEventListener('click', () => openEngineDelete(id, engine.name, remove)); row.append(remove);
     } else {
       const builtIn = document.createElement('small'); builtIn.className = 'engine-built-in'; builtIn.textContent = '默认'; row.append(builtIn);
+      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'engine-visibility'; toggle.dataset.visibilityEngine = id;
+      toggle.textContent = index < 0 ? '显示' : '隐藏'; toggle.setAttribute('aria-label', `${toggle.textContent}搜索引擎：${engine.name}`);
+      toggle.disabled = index >= 0 && settings.engineOrder.length - settings.hiddenEngines.length === 1;
+      if (toggle.disabled) toggle.title = '至少保留一个默认搜索引擎';
+      toggle.addEventListener('click', () => {
+        settings.hiddenEngines = index < 0 ? settings.hiddenEngines.filter(value => value !== id) : [...settings.hiddenEngines, id];
+        settings = normalizeSettings(settings); saveSettings(); updateEngine();
+        $(`[data-visibility-engine="${id}"]`).focus({ preventScroll: true });
+      });
+      row.append(toggle);
     }
     return row;
   }));
-  $('#engine-shortcut-note').textContent = `在首页按 Alt + 1–${engines.length}，按上方顺序切换搜索引擎；按 / 聚焦搜索框。`;
+  $('#engine-shortcut-note').textContent = `在首页按 ${visibleIds.length === 1 ? 'Alt + 1' : `Alt + 1–${visibleIds.length}`}，按可见顺序切换搜索引擎；按 / 聚焦搜索框。`;
   $('#engine-form').hidden = settings.customEngines.length >= MAX_CUSTOM_ENGINES;
 }
 $('#engine-form').addEventListener('submit', event => {
@@ -373,7 +395,7 @@ document.addEventListener('keydown', event => {
   const editing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
   if (event.key === '/' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); $('#search-input').focus(); }
   if (event.altKey && !event.ctrlKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
-    const engine = Object.keys(getEngines(settings.customEngines, settings.engineOrder))[Number(event.key) - 1];
+    const engine = Object.keys(getEngines(settings.customEngines, settings.engineOrder, settings.hiddenEngines))[Number(event.key) - 1];
     if (engine) { event.preventDefault(); settings.engine = engine; saveSettings(); updateEngine(); }
   }
   if (event.key === 'Escape' && editing) document.activeElement.blur();

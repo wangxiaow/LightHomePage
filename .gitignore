@@ -2,6 +2,10 @@
 /*
 !/.gitignore
 !/.dockerignore
+# Keep deployment-specific registration details local.
+/.env
+/.env.*
+!/.env.example
 !/README.md
 !/LICENSE
 !/package.json

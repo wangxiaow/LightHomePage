@@ -64,6 +64,15 @@ body { background:var(--default-color); }
 .engine-tabs button { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .engine-tabs button[draggable="true"] { cursor:grab; }
 .engine-tabs button.is-drop-target { outline:1px dashed currentColor; outline-offset:5px; border-radius:2px; }
+.google-notice { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; margin:10px 4px 0; padding:9px 12px; border:1px solid #ffffff30; border-radius:9px; background:#1b2d2473; color:#fff; font-size:11px; line-height:1.8; }
+.google-notice p { flex:1 1 280px; margin:0; }
+.google-notice button { flex-shrink:0; padding:3px 0; background:transparent; color:inherit; font-size:11px; text-decoration:underline; text-underline-offset:3px; }
+:root[data-background="default"][data-background-period="day"] .google-notice { background:#ffffff80; border-color:#52645c26; color:#52645c; }
+.site-footer:has(.site-registration) { padding-bottom:46px; }
+.site-registration { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); max-width:calc(100% - 40px); text-align:center; font-size:10px; line-height:1.6; overflow-wrap:anywhere; }
+.site-registration:hover { text-decoration:underline; text-underline-offset:3px; }
+body:has(.site-registration) .main-content { padding-bottom:160px; }
+body:has(.site-registration) .wallpaper-notice { bottom:120px; }
 .search-history { display:flex; align-items:center; gap:8px; margin:8px 4px 0; }
 .history-label { flex-shrink:0; font-size:10px; opacity:.65; }
 .history-clear { flex-shrink:0; background:transparent; color:inherit; font-size:10px; padding:6px 2px; opacity:.75; }
@@ -81,6 +90,9 @@ body { background:var(--default-color); }
 .engine-list-row>span { flex:1; min-width:0; overflow-wrap:anywhere; }
 .engine-list-row small { color:#939b8c; font-size:10px; white-space:nowrap; }
 .engine-list-row .engine-built-in { width:29px; text-align:center; }
+.engine-list-row .engine-visibility { width:44px; flex-shrink:0; font-size:11px; color:var(--accent); }
+.engine-list-row .engine-visibility:hover { background:var(--accent-light); color:var(--accent); }
+.engine-list-row .engine-visibility:disabled { cursor:not-allowed; background:transparent; }
 .engine-list-row button { display:grid; place-items:center; width:29px; height:29px; padding:6px; color:#939b8c; background:transparent; border-radius:5px; }
 .engine-list-row button svg { width:15px; height:15px; }
 .engine-list-row button:hover { color:#a55f46; background:#f4ebe6; }

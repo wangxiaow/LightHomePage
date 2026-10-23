@@ -71,7 +71,10 @@ export function apiTarget(url) {
   return null;
 }
 
-export function createApp({ upstreamFetch = fetch, trustedProxies = '', upstreamTimeoutMs = 10000 } = {}) {
+export function createApp({ upstreamFetch = fetch, trustedProxies = '', upstreamTimeoutMs = 10000, icpNumber = '' } = {}) {
+  const registration = typeof icpNumber === 'string' ? icpNumber.trim().slice(0, 80) : '';
+  const escapedRegistration = registration.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+  const registrationHtml = registration ? `<a class="site-registration" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">${escapedRegistration}</a>` : '';
   const clientAddress = createClientAddressResolver(trustedProxies);
   const cache = new Map(), pending = new Map(), limiter = createRateLimiter();
   let cacheBytes = 0, pendingImages = 0;
@@ -142,7 +145,8 @@ export function createApp({ upstreamFetch = fetch, trustedProxies = '', upstream
       }
       const file = files.get(url.pathname);
       if (!file) { send(response, 404, '{"error":"Not found"}', {}, head); return; }
-      const body = await readFile(resolve(publicDirectory, file[0]));
+      let body = await readFile(resolve(publicDirectory, file[0]));
+      if (file[0] === 'index.html') body = Buffer.from(body.toString('utf8').replace('<!-- ICP_REGISTRATION -->', () => registrationHtml));
       send(response, 200, body, { 'Content-Type': file[1], 'Cache-Control': url.pathname.endsWith('.jpg') ? 'public, max-age=604800' : 'no-cache', 'Content-Length': body.length }, head);
     } catch { send(response, 500, '{"error":"Server error"}', {}, head); }
   });
@@ -153,6 +157,9 @@ export function createApp({ upstreamFetch = fetch, trustedProxies = '', upstream
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // This deployment-specific file is ignored by Git and excluded from Docker images.
+  try { process.loadEnvFile(fileURLToPath(new URL('./.env', import.meta.url))); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
   const port = Number(process.env.PORT || 5173), host = process.env.HOST || '127.0.0.1';
-  createApp({ trustedProxies: process.env.TRUSTED_PROXIES || '' }).listen(port, host, () => console.log(`白页已启动 · http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`));
+  createApp({ trustedProxies: process.env.TRUSTED_PROXIES || '', icpNumber: process.env.BAIYE_ICP_NUMBER || '' }).listen(port, host, () => console.log(`白页已启动 · http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`));
 }
