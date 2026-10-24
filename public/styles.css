@@ -68,8 +68,8 @@ body { background:var(--default-color); }
 .google-notice p { flex:1 1 280px; margin:0; }
 .google-notice button { flex-shrink:0; padding:3px 0; background:transparent; color:inherit; font-size:11px; text-decoration:underline; text-underline-offset:3px; }
 :root[data-background="default"][data-background-period="day"] .google-notice { background:#ffffff80; border-color:#52645c26; color:#52645c; }
-.site-footer:has(.site-registration) { padding-bottom:46px; }
-.site-registration { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); max-width:calc(100% - 40px); text-align:center; font-size:10px; line-height:1.6; overflow-wrap:anywhere; }
+body:has(.site-registration) .site-footer { padding-bottom:46px; }
+.site-registration { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); max-width:calc(100% - 40px); text-align:center; font-size:10px; line-height:1.6; color:#ffffffd6; overflow-wrap:anywhere; z-index:1; }
 .site-registration:hover { text-decoration:underline; text-underline-offset:3px; }
 body:has(.site-registration) .main-content { padding-bottom:160px; }
 body:has(.site-registration) .wallpaper-notice { bottom:120px; }
@@ -121,7 +121,7 @@ body:has(.site-registration) .wallpaper-notice { bottom:120px; }
 }
 :root[data-background="default"][data-background-period="day"] .wallpaper-shade { background:none; }
 :root[data-background="default"][data-background-period="day"] :is(.hero,.engine-tabs button,.shortcut-name) { text-shadow:none; }
-:root[data-background="default"][data-background-period="day"] :is(.site-footer,.shortcut-add) { color:#52645c; }
+:root[data-background="default"][data-background-period="day"] :is(.site-footer,.shortcut-add,.site-registration) { color:#52645c; }
 :root[data-background="default"][data-background-period="day"] .header-settings { border-color:#52645c40; }
 :root[data-background="default"][data-background-period="day"] .icon-button:hover { background:#52645c12; }
 :root[data-background="default"][data-background-period="day"] :is(.detail-divider,.footer-divider) { background:#52645c40; }
