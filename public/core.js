@@ -1,6 +1,6 @@
 // Keep the original browser storage namespace so renaming does not reset existing preferences.
 export const SETTINGS_KEY = 'qiye.settings.v1';
-export const APP_VERSION = '0.1.5-Beta';
+export const APP_VERSION = '0.1.6-Beta';
 export const SEARCH_HISTORY_KEY = 'qiye.search-history.v1';
 export const MAX_CUSTOM_ENGINES = 6;
 export const MAX_SEARCH_HISTORY = 20;
